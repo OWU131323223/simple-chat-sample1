@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ボールキャッチゲーム</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.js"></script>
+  </head>
+
+  <body>
+    <h1>スマホを傾けてアイテムをキャッチ！</h1>
+    <div>
+      <div>あなたのID: <span id="myid"></span></div>
+      <button id="connect">ルームに入る</button>
+      <div>スマホを傾けて操作。アイテムを取るとスコアアップ！</div>
+      <div>スコア: <span id="score">0</span></div>
+    </div>
+
+    <script>
+      let socket = io.connect();
+      let btn = document.querySelector("#connect");
+      let g = 0;
+      let b = 0;
+
+      // ユーザーID管理
+      let myid = sessionStorage.getItem('clientId');
+      if (!myid) {
+        myid = Math.random().toString(36).substring(2, 15);
+        sessionStorage.setItem('clientId', myid);
+      }
+      document.querySelector("#myid").innerHTML = myid;
+      console.log("あなたのID: ", myid);
+
+      btn.addEventListener("click", function () {
+        socket.emit("join", "game");
+        btn.remove();
+      });
+
+      socket.on("sensor", function (data) {
+        g = parseFloat(data.g);
+        b = parseFloat(data.b);
+        // console.log(data);
+      });
+
+      // --- p5.js ゲーム設定 ---
+      let x = 0;
+      let y = 300; // ボールは地面上に
+      let r = 40;
+      let speed = 0.5;
+      let score = 0;
+      let items = [];
+
+      function setup() {
+        createCanvas(800, 800, WEBGL);
+        camera(0, 600, 800, 0, 0, 0, 0, 1, 0);
+        noStroke();
+        frameRate(60);
+      }
+
+      function draw() {
+        background(30, 30, 50);
+        orbitControl();
+        ambientLight(100);
+        pointLight(255, 255, 255, 0, -200, 400);
+
+        // 地面
+        push();
+        rotateX(PI / 2);
+        fill(60, 100, 60);
+        plane(1000, 1000);
+        pop();
+
+        // プレイヤー操作
+        x += speed * g;
+        if (x > 400) x = 400;
+        if (x < -400) x = -400;
+
+        // プレイヤー描画
+        push();
+        translate(x, y, 0);
+        specularMaterial(200, 200, 255);
+        sphere(r);
+        pop();
+
+        // アイテム生成
+        if (frameCount % 90 === 0) {
+          items.push({
+            x: random(-400, 400),
+            y: -400,
+            z: random(-100, 100),
+            size: random(20, 40),
+            speed: random(2, 4),
+            color: [random(100, 255), random(100, 255), random(100, 255)]
+          });
+        }
+
+        // アイテム更新
+        for (let i = items.length - 1; i >= 0; i--) {
+          let it = items[i];
+          it.y += it.speed;
+
+          // 衝突判定
+          let d = dist(x, y, 0, it.x, it.y, it.z);
+          if (d < r + it.size / 2) {
+            score++;
+            document.querySelector("#score").innerHTML = score;
+            items.splice(i, 1);
+            continue;
+          }
+
+          // 落ちすぎたら削除
+          if (it.y > 500) {
+            items.splice(i, 1);
+            continue;
+          }
+
+          // 描画
+          push();
+          translate(it.x, it.y, it.z);
+          ambientMaterial(it.color[0], it.color[1], it.color[2]);
+          sphere(it.size);
+          pop();
+        }
+      }
+    </script>
+  </body>
+</html>
+WA
